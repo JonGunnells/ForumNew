@@ -36,10 +36,17 @@ public class Main {
                         }
                     }
 
+                    Message parentMsg = null;
+                    if (replyId >= 0) {
+                        parentMsg = messages.get(replyId);
+                    }
+
                     HashMap m = new HashMap();
                     m.put("messages", subset);
                     m.put("username", username);
                     m.put("replyId", replyId);
+                    m.put("message", parentMsg);
+                    m.put("isMe", parentMsg != null && parentMsg.author.equals(username));
                     return new ModelAndView(m, "home.html");
                 },
                 new MustacheTemplateEngine()
@@ -73,26 +80,52 @@ public class Main {
         );
         Spark.post(
                 "/create-message",
-        (request, response) -> {
-            Session session = request.session();
-            String username = session.attribute("username");
-            if (username == null) {
-                throw new Exception("not logged in");
-            }
+                (request, response) -> {
+                    Session session = request.session();
+                    String username = session.attribute("username");
+                    if (username == null) {
+                        throw new Exception("not logged in");
+                    }
 
-            int replyId = Integer.valueOf(request.queryParams("replyId"));
-            String text = request.queryParams("message");
+                    int replyId = Integer.valueOf(request.queryParams("replyId"));
+                    String text = request.queryParams("message");
 
-            Message msg = new Message(messages.size(), replyId, username, text);
-            messages.add(msg);
+                    Message msg = new Message(messages.size(), replyId, username, text);
+                    messages.add(msg);
 
-            response.redirect(request.headers("Referer"));
-            return "";
-        }
+                    response.redirect(request.headers("Referer"));
+                    return "";
+                }
 
 
         );
+        Spark.post(
+                "/delete-message",
+                (request, response) -> {
+                    int id = Integer.valueOf(request.queryParams("id"));
+
+                    Session session = request.session();
+                    String username = session.attribute("username");
+                    Message m = messages.get(id);
+                    if (!m.author.equals(username)) {
+                        throw new Exception("you cant delete this");
+
+                    messages.remove(id);
+                    //reset ids
+                    int index = 0;
+                    for (Message msg : messages) {
+                        msg.id = index;
+                        index++;
+                    }
+                    response.redirect("/");
+                    return "";
+                }
+
+        );
     }
+
+
+
     static void addTestUsers() {
         users.put("Alice", new User("Alice", ""));
         users.put("Bob", new User("Bob", ""));
